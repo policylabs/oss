@@ -1,0 +1,84 @@
+{
+    id: policyctl-release
+    meta: {
+        description:
+            '''
+            # policyctl release verification
+
+            Verifies the binaries published in the releases of
+            https://github.com/carabiner-dev/policyctl through the SLSA provenance
+            attestation shipped with every release.
+
+            The provenance must be signed keyless (sigstore) by the release
+            workflow of the policyctl repository running on GitHub Actions for a
+            version tag. Only attestations from that signer are admitted, so a
+            missing, unsigned or foreign-signed provenance fails verification.
+
+            The admitted provenance is then checked with the SLSA policies from
+            the community library in https://github.com/carabiner-dev/policies:
+            the artifact was built by the release workflow, with the GitHub
+            Actions workflow build type, from the policyctl repository.
+            '''
+        version: 1
+        frameworks: [
+            { id: "SLSA", name: "Supply-Chain Levels for Software Artifacts" }
+        ]
+    }
+
+    common: {
+        // Only provenance signed by the release workflow on a version tag
+        // is admitted for evaluation.
+        identities: [
+            {
+                id: policyctl-release-workflow
+                sigstore: {
+                    issuerMatch: { exact: "https://token.actions.githubusercontent.com" }
+                    identityMatch: { regex: "^https://github\\.com/carabiner-dev/policyctl/\\.github/workflows/release\\.yaml@refs/tags/v[0-9].*$" }
+                }
+            }
+        ]
+
+        context: {
+            // The workflow that built the binaries (the provenance builder id
+            // pins it to a commit, which the policy accepts as a suffix).
+            builderId: { value: "https://github.com/carabiner-dev/policyctl/.github/workflows/release.yaml" }
+
+            // Built with the GitHub Actions workflow build type
+            buildType: { value: "https://actions.github.io/buildtypes/workflow/v1" }
+
+            // Built from the policyctl repository
+            buildPoint: { value: "git+ssh://github.com/carabiner-dev/policyctl" }
+        }
+    }
+
+    policies: [
+        {
+            id: slsa-has-attestation
+            source: {
+                location: { uri: "git+https://github.com/carabiner-dev/policies@38b963e3ece486af6502a454df9609bbc95abcbd#slsa/has-attestation.json" }
+            }
+            meta: { controls: [ { framework: "SLSA", class: "BUILD", id: "LEVEL_1" } ] }
+        }
+        {
+            id: slsa-builder-id
+            source: {
+                location: { uri: "git+https://github.com/carabiner-dev/policies@38b963e3ece486af6502a454df9609bbc95abcbd#slsa/slsa-builder-id.json" }
+            }
+            meta: { controls: [ { framework: "SLSA", class: "BUILD", id: "LEVEL_2" } ] }
+        }
+        {
+            id: slsa-build-type
+            source: {
+                location: { uri: "git+https://github.com/carabiner-dev/policies@38b963e3ece486af6502a454df9609bbc95abcbd#slsa/slsa-build-type.json" }
+            }
+            meta: { controls: [ { framework: "SLSA", class: "BUILD", id: "LEVEL_2" } ] }
+        }
+        {
+            id: slsa-build-point
+            source: {
+                location: { uri: "git+https://github.com/carabiner-dev/policies@38b963e3ece486af6502a454df9609bbc95abcbd#slsa/slsa-build-point.json" }
+            }
+            meta: { controls: [ { framework: "SLSA", class: "BUILD", id: "LEVEL_2" } ] }
+        }
+    ]
+}
